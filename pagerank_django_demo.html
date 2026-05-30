@@ -1,0 +1,426 @@
+
+<style>
+  .tab-bar { display:flex; gap:4px; margin-bottom:1.5rem; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .tab { padding:8px 16px; font-size:13px; cursor:pointer; background:none; border:none; border-bottom:2px solid transparent; color:var(--color-text-secondary); font-family:var(--font-sans); }
+  .tab.active { border-bottom:2px solid #534AB7; color:#534AB7; font-weight:500; }
+  .code-block { background:var(--color-background-secondary); border:0.5px solid var(--color-border-tertiary); border-radius:var(--border-radius-md); padding:1rem 1.25rem; font-family:var(--font-mono); font-size:12px; line-height:1.7; overflow-x:auto; white-space:pre; color:var(--color-text-primary); margin-bottom:1rem; }
+  .kw { color:#534AB7; } .fn { color:#0F6E56; } .st { color:#993C1D; } .cm { color:var(--color-text-tertiary); }
+  .file-label { font-size:11px; color:var(--color-text-tertiary); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:var(--border-radius-md); font-size:11px; font-weight:500; }
+  .badge-purple { background:#EEEDFE; color:#3C3489; }
+  .badge-teal { background:#E1F5EE; color:#085041; }
+  .badge-amber { background:#FAEEDA; color:#633806; }
+  .node-bar-wrap { margin-bottom:10px; }
+  .node-label { font-size:13px; font-weight:500; margin-bottom:3px; display:flex; justify-content:space-between; }
+  .bar-bg { background:var(--color-background-secondary); border-radius:4px; height:20px; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:4px; transition:width 0.6s ease; display:flex; align-items:center; padding-left:8px; font-size:11px; font-weight:500; }
+  .panel { display:none; } .panel.active { display:block; }
+  .iter-row { display:flex; gap:8px; align-items:center; font-size:12px; margin-bottom:4px; }
+  .iter-num { color:var(--color-text-tertiary); min-width:50px; }
+  .metric-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:1.5rem; }
+  .metric { background:var(--color-background-secondary); border-radius:var(--border-radius-md); padding:0.75rem 1rem; }
+  .metric-label { font-size:11px; color:var(--color-text-secondary); margin-bottom:4px; }
+  .metric-val { font-size:20px; font-weight:500; color:var(--color-text-primary); }
+  .run-btn { padding:8px 20px; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); background:none; font-family:var(--font-sans); font-size:13px; cursor:pointer; color:var(--color-text-primary); margin-bottom:1.5rem; }
+  .run-btn:hover { background:var(--color-background-secondary); }
+  .graph-svg text { font-family:var(--font-sans); }
+</style>
+
+<h2 class="sr-only">Django PageRank Algorithm — interactive project viewer and live simulation</h2>
+
+<div style="padding:1rem 0;">
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:1.5rem;">
+    <span class="badge badge-purple">Django 4.2</span>
+    <span class="badge badge-teal">PageRank</span>
+    <span class="badge badge-amber">Graph Data Science</span>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="showTab('structure')">Project structure</button>
+    <button class="tab" onclick="showTab('models')">models.py</button>
+    <button class="tab" onclick="showTab('algo')">pagerank.py</button>
+    <button class="tab" onclick="showTab('views')">views.py</button>
+    <button class="tab" onclick="showTab('run')">Run it ▶</button>
+  </div>
+
+  <div id="tab-structure" class="panel active">
+    <div class="code-block"><span class="cm">django_pagerank/          ← project root
+├── manage.py
+├── requirements.txt
+├── django_pagerank/
+│   ├── settings.py
+│   ├── urls.py
+│   └── wsgi.py
+└── graph_app/               ← our main app
+    ├── models.py            ← Node + Edge models
+    ├── pagerank.py          ← PageRank algorithm
+    ├── views.py             ← API + HTML views
+    ├── urls.py
+    ├── admin.py
+    └── templates/
+        └── graph_app/
+            └── index.html</span></div>
+    <div class="code-block"><span class="cm"># requirements.txt</span>
+Django&gt;=4.2
+networkx&gt;=3.0
+numpy&gt;=1.24</div>
+  </div>
+
+  <div id="tab-models" class="panel">
+    <div class="file-label"><i class="ti ti-file-code" aria-hidden="true"></i> graph_app/models.py</div>
+    <div class="code-block"><span class="kw">from</span> django.db <span class="kw">import</span> models
+
+
+<span class="kw">class</span> <span class="fn">Node</span>(models.Model):
+    name = models.CharField(max_length=<span class="st">100</span>, unique=<span class="kw">True</span>)
+    pagerank_score = models.FloatField(default=<span class="st">0.0</span>)
+    created_at = models.DateTimeField(auto_now_add=<span class="kw">True</span>)
+
+    <span class="kw">def</span> <span class="fn">__str__</span>(self):
+        <span class="kw">return</span> <span class="st">f"</span>{self.name}<span class="st"> (PR={self.pagerank_score:.4f})"</span>
+
+    <span class="kw">class</span> <span class="fn">Meta</span>:
+        ordering = [<span class="st">'-pagerank_score'</span>]
+
+
+<span class="kw">class</span> <span class="fn">Edge</span>(models.Model):
+    source = models.ForeignKey(
+        Node, on_delete=models.CASCADE,
+        related_name=<span class="st">'outgoing_edges'</span>
+    )
+    target = models.ForeignKey(
+        Node, on_delete=models.CASCADE,
+        related_name=<span class="st">'incoming_edges'</span>
+    )
+    weight = models.FloatField(default=<span class="st">1.0</span>)
+
+    <span class="kw">class</span> <span class="fn">Meta</span>:
+        unique_together = [<span class="st">'source'</span>, <span class="st">'target'</span>]
+
+    <span class="kw">def</span> <span class="fn">__str__</span>(self):
+        <span class="kw">return</span> <span class="st">f"</span>{self.source.name}<span class="st"> → </span>{self.target.name}<span class="st">"</span></div>
+  </div>
+
+  <div id="tab-algo" class="panel">
+    <div class="file-label"><i class="ti ti-math-function" aria-hidden="true"></i> graph_app/pagerank.py</div>
+    <div class="code-block"><span class="cm">"""
+PageRank implementation using the power iteration method.
+PR(u) = (1-d)/N + d * Σ PR(v) / OutDegree(v)
+"""</span>
+<span class="kw">from</span> typing <span class="kw">import</span> Dict, List, Tuple
+<span class="kw">from</span> .models <span class="kw">import</span> Node, Edge
+
+
+<span class="kw">def</span> <span class="fn">run_pagerank</span>(
+    damping: float = <span class="st">0.85</span>,
+    max_iter: int = <span class="st">100</span>,
+    tol: float = <span class="st">1e-6</span>
+) -&gt; Tuple[Dict[str, float], int, List[float]]:
+    <span class="cm">"""
+    Returns (scores_dict, iterations_used, convergence_errors)
+    """</span>
+    nodes = list(Node.objects.all())
+    edges = list(Edge.objects.select_related(<span class="st">'source'</span>, <span class="st">'target'</span>).all())
+    N = len(nodes)
+    <span class="kw">if</span> N == <span class="st">0</span>:
+        <span class="kw">return</span> {}, <span class="st">0</span>, []
+
+    <span class="cm"># Build adjacency: out_links[node_id] = [target_id, ...]</span>
+    node_ids = {n.id: i <span class="kw">for</span> i, n <span class="kw">in</span> enumerate(nodes)}
+    out_links = {i: [] <span class="kw">for</span> i <span class="kw">in</span> range(N)}
+    <span class="kw">for</span> edge <span class="kw">in</span> edges:
+        src = node_ids[edge.source_id]
+        tgt = node_ids[edge.target_id]
+        out_links[src].append(tgt)
+
+    <span class="cm"># Initialise uniform ranks</span>
+    ranks = [<span class="st">1.0</span> / N] * N
+    errors = []
+
+    <span class="kw">for</span> iteration <span class="kw">in</span> range(max_iter):
+        new_ranks = [(<span class="st">1.0</span> - damping) / N] * N
+
+        <span class="kw">for</span> src_i, targets <span class="kw">in</span> out_links.items():
+            <span class="kw">if not</span> targets:            <span class="cm"># dangling node</span>
+                contrib = ranks[src_i] / N
+                new_ranks = [r + damping * contrib
+                             <span class="kw">for</span> r <span class="kw">in</span> new_ranks]
+            <span class="kw">else</span>:
+                share = damping * ranks[src_i] / len(targets)
+                <span class="kw">for</span> tgt_i <span class="kw">in</span> targets:
+                    new_ranks[tgt_i] += share
+
+        error = sum(abs(new_ranks[i] - ranks[i]) <span class="kw">for</span> i <span class="kw">in</span> range(N))
+        errors.append(error)
+        ranks = new_ranks
+
+        <span class="kw">if</span> error &lt; tol:
+            <span class="cm"># Save scores back to DB</span>
+            <span class="kw">for</span> i, node <span class="kw">in</span> enumerate(nodes):
+                node.pagerank_score = ranks[i]
+                node.save(update_fields=[<span class="st">'pagerank_score'</span>])
+            <span class="kw">return</span> (
+                {nodes[i].name: ranks[i] <span class="kw">for</span> i <span class="kw">in</span> range(N)},
+                iteration + <span class="st">1</span>,
+                errors
+            )
+
+    <span class="kw">raise</span> RuntimeError(<span class="st">"PageRank did not converge"</span>)</div>
+  </div>
+
+  <div id="tab-views" class="panel">
+    <div class="file-label"><i class="ti ti-layout" aria-hidden="true"></i> graph_app/views.py</div>
+    <div class="code-block"><span class="kw">from</span> django.http <span class="kw">import</span> JsonResponse
+<span class="kw">from</span> django.views <span class="kw">import</span> View
+<span class="kw">from</span> django.shortcuts <span class="kw">import</span> render
+<span class="kw">from</span> .models <span class="kw">import</span> Node, Edge
+<span class="kw">from</span> .pagerank <span class="kw">import</span> run_pagerank
+<span class="kw">import</span> json
+
+
+<span class="kw">class</span> <span class="fn">GraphView</span>(View):
+    <span class="kw">def</span> <span class="fn">get</span>(self, request):
+        <span class="kw">return</span> render(request, <span class="st">'graph_app/index.html'</span>)
+
+
+<span class="kw">class</span> <span class="fn">SeedGraphView</span>(View):
+    <span class="cm">"""POST: seed sample web-page graph into the DB"""</span>
+    <span class="kw">def</span> <span class="fn">post</span>(self, request):
+        pages = [<span class="st">'Home'</span>, <span class="st">'About'</span>, <span class="st">'Blog'</span>,
+                 <span class="st">'Contact'</span>, <span class="st">'Docs'</span>, <span class="st">'Forum'</span>,
+                 <span class="st">'Search'</span>, <span class="st">'Login'</span>]
+        links = [
+            (<span class="st">'Home'</span>,<span class="st">'Blog'</span>), (<span class="st">'Home'</span>,<span class="st">'About'</span>),
+            (<span class="st">'Home'</span>,<span class="st">'Docs'</span>),  (<span class="st">'Blog'</span>,<span class="st">'Home'</span>),
+            (<span class="st">'Blog'</span>,<span class="st">'Forum'</span>), (<span class="st">'About'</span>,<span class="st">'Home'</span>),
+            (<span class="st">'Docs'</span>,<span class="st">'Home'</span>),  (<span class="st">'Docs'</span>,<span class="st">'Forum'</span>),
+            (<span class="st">'Forum'</span>,<span class="st">'Docs'</span>), (<span class="st">'Forum'</span>,<span class="st">'Blog'</span>),
+            (<span class="st">'Search'</span>,<span class="st">'Home'</span>),(<span class="st">'Login'</span>,<span class="st">'Home'</span>),
+            (<span class="st">'Contact'</span>,<span class="st">'Home'</span>)
+        ]
+        Node.objects.all().delete()
+        nodes = {name: Node.objects.create(name=name)
+                 <span class="kw">for</span> name <span class="kw">in</span> pages}
+        <span class="kw">for</span> src, tgt <span class="kw">in</span> links:
+            Edge.objects.create(
+                source=nodes[src], target=nodes[tgt])
+        <span class="kw">return</span> JsonResponse({<span class="st">'status'</span>: <span class="st">'seeded'</span>,
+                             <span class="st">'nodes'</span>: len(pages),
+                             <span class="st">'edges'</span>: len(links)})
+
+
+<span class="kw">class</span> <span class="fn">RunPageRankView</span>(View):
+    <span class="cm">"""POST: run algorithm, GET: return stored scores"""</span>
+    <span class="kw">def</span> <span class="fn">post</span>(self, request):
+        body = json.loads(request.body <span class="kw">or</span> <span class="st">'{}'</span>)
+        damping = float(body.get(<span class="st">'damping'</span>, <span class="st">0.85</span>))
+        scores, iters, errors = run_pagerank(damping=damping)
+        <span class="kw">return</span> JsonResponse({
+            <span class="st">'scores'</span>: scores,
+            <span class="st">'iterations'</span>: iters,
+            <span class="st">'final_error'</span>: errors[-<span class="st">1</span>],
+            <span class="st">'convergence'</span>: errors
+        })
+
+
+<span class="cm"># graph_app/urls.py</span>
+<span class="cm"># urlpatterns = [
+#   path('', GraphView.as_view()),
+#   path('api/seed/', SeedGraphView.as_view()),
+#   path('api/pagerank/', RunPageRankView.as_view()),
+# ]</span></div>
+  </div>
+
+  <div id="tab-run" class="panel">
+    <div style="margin-bottom:1rem;">
+      <label style="font-size:13px; color:var(--color-text-secondary);">Damping factor (d)</label>
+      <div style="display:flex; align-items:center; gap:12px; margin-top:6px;">
+        <input type="range" id="damping" min="0.5" max="0.99" step="0.01" value="0.85" style="flex:1;">
+        <span id="damping-val" style="font-size:14px; font-weight:500; min-width:32px;">0.85</span>
+      </div>
+    </div>
+    <button class="run-btn" onclick="runSim()"><i class="ti ti-player-play" aria-hidden="true"></i> Run PageRank on sample graph</button>
+
+    <div id="metrics" class="metric-grid" style="display:none;">
+      <div class="metric"><div class="metric-label">Nodes</div><div class="metric-val" id="m-nodes">—</div></div>
+      <div class="metric"><div class="metric-label">Edges</div><div class="metric-val" id="m-edges">—</div></div>
+      <div class="metric"><div class="metric-label">Iterations to converge</div><div class="metric-val" id="m-iter">—</div></div>
+    </div>
+
+    <div id="graph-vis" style="display:none;">
+      <p style="font-size:13px; color:var(--color-text-secondary); margin-bottom:8px;">Graph topology — node size reflects PageRank score</p>
+      <svg id="graph-svg" viewBox="0 0 640 260" width="100%" style="border:0.5px solid var(--color-border-tertiary); border-radius:var(--border-radius-md); background:var(--color-background-secondary); margin-bottom:1.5rem;">
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#B4B2A9"/>
+          </marker>
+        </defs>
+        <g id="edges-g"></g>
+        <g id="nodes-g"></g>
+      </svg>
+
+      <p style="font-size:13px; color:var(--color-text-secondary); margin-bottom:10px;">PageRank scores — ranked</p>
+      <div id="bar-chart"></div>
+
+      <p style="font-size:13px; font-weight:500; margin:1.5rem 0 8px;">Convergence — error per iteration</p>
+      <svg id="conv-svg" viewBox="0 0 640 120" width="100%" style="border:0.5px solid var(--color-border-tertiary); border-radius:var(--border-radius-md); background:var(--color-background-secondary);"></svg>
+    </div>
+  </div>
+</div>
+
+<script>
+function showTab(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+document.getElementById('damping').addEventListener('input', function() {
+  document.getElementById('damping-val').textContent = parseFloat(this.value).toFixed(2);
+});
+
+const GRAPH = {
+  nodes: ['Home','About','Blog','Contact','Docs','Forum','Search','Login'],
+  edges: [
+    ['Home','Blog'],['Home','About'],['Home','Docs'],
+    ['Blog','Home'],['Blog','Forum'],['About','Home'],
+    ['Docs','Home'],['Docs','Forum'],['Forum','Docs'],
+    ['Forum','Blog'],['Search','Home'],['Login','Home'],['Contact','Home']
+  ]
+};
+
+function computePageRank(d, maxIter=200, tol=1e-6) {
+  const nodes = GRAPH.nodes;
+  const N = nodes.length;
+  const idx = {};
+  nodes.forEach((n,i) => idx[n]=i);
+  const outLinks = Array.from({length:N}, ()=>[]);
+  GRAPH.edges.forEach(([s,t]) => outLinks[idx[s]].push(idx[t]));
+  let ranks = new Array(N).fill(1/N);
+  const errors = [];
+  let iters = 0;
+  for(let it=0; it<maxIter; it++) {
+    const nr = new Array(N).fill((1-d)/N);
+    for(let i=0;i<N;i++) {
+      const outs = outLinks[i];
+      if(!outs.length) { for(let j=0;j<N;j++) nr[j] += d*ranks[i]/N; }
+      else { const share = d*ranks[i]/outs.length; outs.forEach(t => nr[t]+=share); }
+    }
+    const err = ranks.reduce((s,r,i)=>s+Math.abs(nr[i]-r),0);
+    errors.push(err);
+    ranks = nr; iters++;
+    if(err < tol) break;
+  }
+  const scores = {};
+  nodes.forEach((n,i) => scores[n]=ranks[i]);
+  return {scores, iters, errors};
+}
+
+function runSim() {
+  const d = parseFloat(document.getElementById('damping').value);
+  const {scores, iters, errors} = computePageRank(d);
+  const N = GRAPH.nodes.length, E = GRAPH.edges.length;
+
+  document.getElementById('m-nodes').textContent = N;
+  document.getElementById('m-edges').textContent = E;
+  document.getElementById('m-iter').textContent = iters;
+  document.getElementById('metrics').style.display = 'grid';
+  document.getElementById('graph-vis').style.display = 'block';
+
+  drawGraph(scores);
+  drawBars(scores);
+  drawConvergence(errors);
+}
+
+const POSITIONS = {
+  'Home':   [200,130], 'Blog':   [100,60],  'About':  [320,40],
+  'Docs':   [320,220], 'Forum':  [180,220], 'Contact':[440,130],
+  'Search': [80,190],  'Login':  [460,60]
+};
+
+function drawGraph(scores) {
+  const svg = document.getElementById('graph-svg');
+  const eg = document.getElementById('edges-g');
+  const ng = document.getElementById('nodes-g');
+  eg.innerHTML = ''; ng.innerHTML = '';
+  const vals = Object.values(scores);
+  const maxS = Math.max(...vals), minS = Math.min(...vals);
+
+  GRAPH.edges.forEach(([s,t]) => {
+    const [x1,y1]=POSITIONS[s],[x2,y2]=POSITIONS[t];
+    const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy);
+    const r = 16 + 14*(scores[t]-minS)/(maxS-minS||1);
+    const ex=x2-dx/len*r, ey=y2-dy/len*r;
+    const l=document.createElementNS('http://www.w3.org/2000/svg','line');
+    l.setAttribute('x1',x1); l.setAttribute('y1',y1);
+    l.setAttribute('x2',ex); l.setAttribute('y2',ey);
+    l.setAttribute('stroke','#B4B2A9'); l.setAttribute('stroke-width','1');
+    l.setAttribute('marker-end','url(#arr)');
+    eg.appendChild(l);
+  });
+
+  GRAPH.nodes.forEach(name => {
+    const [cx,cy]=POSITIONS[name];
+    const r = Math.round(16 + 14*(scores[name]-minS)/(maxS-minS||1));
+    const frac = (scores[name]-minS)/(maxS-minS||1);
+    const fill = frac > 0.6 ? '#534AB7' : frac > 0.3 ? '#7F77DD' : '#AFA9EC';
+    const tc = frac > 0.6 ? '#EEEDFE' : '#EEEDFE';
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',cx); c.setAttribute('cy',cy); c.setAttribute('r',r);
+    c.setAttribute('fill',fill);
+    const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
+    txt.setAttribute('x',cx); txt.setAttribute('y',cy+4);
+    txt.setAttribute('text-anchor','middle');
+    txt.setAttribute('font-size',r>20?'11':'9');
+    txt.setAttribute('fill',tc);
+    txt.textContent=name;
+    g.appendChild(c); g.appendChild(txt);
+    ng.appendChild(g);
+  });
+}
+
+const COLORS = ['#534AB7','#7F77DD','#7F77DD','#AFA9EC','#AFA9EC','#AFA9EC','#CECBF6','#CECBF6'];
+
+function drawBars(scores) {
+  const sorted = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const maxS = sorted[0][1];
+  const bc = document.getElementById('bar-chart');
+  bc.innerHTML = '';
+  sorted.forEach(([name, score], i) => {
+    const pct = Math.round(score/maxS*100);
+    const div = document.createElement('div');
+    div.className = 'node-bar-wrap';
+    div.innerHTML = `<div class="node-label"><span>${name}</span><span style="color:var(--color-text-secondary);font-size:12px;">${score.toFixed(5)}</span></div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${COLORS[i]};color:${i<3?'#EEEDFE':'#3C3489'}">${i===0?'★ top':''}</div></div>`;
+    bc.appendChild(div);
+  });
+}
+
+function drawConvergence(errors) {
+  const svg = document.getElementById('conv-svg');
+  svg.innerHTML = '';
+  const W=640, H=120, pad=30;
+  const n=errors.length;
+  const maxE=Math.max(...errors), minE=Math.min(...errors);
+  const xs=i=>(pad+(W-2*pad)*i/(n-1||1));
+  const ys=v=>(H-pad-(H-2*pad)*(v-minE)/(maxE-minE||1));
+  let d=`M${xs(0)},${ys(errors[0])}`;
+  errors.forEach((e,i)=>{ if(i) d+=` L${xs(i)},${ys(e)}`; });
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d',d); path.setAttribute('stroke','#534AB7');
+  path.setAttribute('stroke-width','2'); path.setAttribute('fill','none');
+  svg.appendChild(path);
+  const label=(txt,x,y)=>{
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',x); t.setAttribute('y',y);
+    t.setAttribute('font-size','10'); t.setAttribute('fill','#888780');
+    t.setAttribute('text-anchor','middle'); t.textContent=txt;
+    svg.appendChild(t);
+  };
+  label('iteration 1',xs(0),H-8);
+  label(`iteration ${n}`,xs(n-1),H-8);
+  label('error',pad-10,H/2);
+}
+</script>
